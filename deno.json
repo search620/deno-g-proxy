@@ -1,0 +1,18 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env main.ts",
+    "start": "deno run --allow-net --allow-env main.ts",
+    "deploy": "deployctl deploy --project=gemini-proxy main.ts"
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.208.0/"
+  },
+  "deploy": {
+    "project": "3913dcfe-7ddf-4423-bd1f-31793f52d925",
+    "exclude": [
+      "**/node_modules"
+    ],
+    "include": [],
+    "entrypoint": "main.ts"
+  }
+}
