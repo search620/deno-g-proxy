@@ -1,26 +1,28 @@
-# Serverless部署指南
 
-本指南将帮助您在各种Serverless平台上部署Gemini API转发实例，实现真正的多IP分发。
+# Serverless Deployment Guide
 
-## 概述
+This guide helps you deploy a Gemini API proxy instance on various serverless platforms, enabling true multi-IP distribution.
 
-Serverless实例的作用是：
-1. 接收来自VS Code扩展的API请求
-2. 转发请求到Google Gemini API
-3. 返回响应给扩展
-4. 提供健康检查端点
+## Overview
 
-## 支持的平台
+The serverless instance functions to:
+
+1. Receive API requests from the VS Code extension
+2. Forward requests to the Google Gemini API
+3. Return responses to the extension
+4. Provide a health check endpoint
+
+## Supported Platforms
 
 ### 1. Deno Deploy
 
-Deno Deploy是推荐的平台，部署简单且性能优秀。
+Deno Deploy is the recommended platform, easy to deploy and performant.
 
-#### 部署步骤
+#### Deployment Steps
 
-1. **创建项目文件**
+1. **Create the project file**
 
-创建 `main.ts` 文件：
+Create `main.ts`:
 
 ```typescript
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
@@ -29,26 +31,26 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  
-  // 健康检查端点
+
+  // Health check endpoint
   if (url.pathname === "/health") {
     return new Response("OK", { status: 200 });
   }
-  
-  // 转发Gemini API请求
+
+  // Forward Gemini API requests
   if (url.pathname.startsWith("/v1beta/")) {
     const targetUrl = `${GEMINI_API_BASE}${url.pathname}${url.search}`;
-    
+
     const headers = new Headers(req.headers);
     headers.set("User-Agent", "Gemini-Aggregator-Serverless/1.0");
-    
+
     try {
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
         body: req.body,
       });
-      
+
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -61,52 +63,56 @@ async function handler(req: Request): Promise<Response> {
       );
     }
   }
-  
+
   return new Response("Not Found", { status: 404 });
 }
 
-serve(handler, { port: 8000 });
+// Listen on the port defined by Deno Deploy environment or default to 8000
+const port = Number(Deno.env.get("PORT")) || 8000;
+serve(handler, { port });
 ```
 
-2. **部署到Deno Deploy**
+2. **Deploy to Deno Deploy**
 
 ```bash
-# 安装Deno CLI
+# Install Deno CLI if needed
 curl -fsSL https://deno.land/install.sh | sh
 
-# 登录Deno Deploy
+# Deploy with Deno task or deployctl CLI
 deno task deploy
 
-# 或者通过GitHub集成自动部署
+# Or use GitHub integration for automatic deployment
 ```
 
-3. **配置域名**
+3. **Domain Setup**
 
-Deno Deploy会提供一个默认域名，如：`https://your-project.deno.dev`
+Deno Deploy provides a default domain such as `https://your-project.deno.dev`
+
+---
 
 ### 2. Vercel
 
-Vercel支持多种运行时，推荐使用Node.js。
+Vercel supports multiple runtimes, Node.js is recommended.
 
-#### 部署步骤
+#### Deployment Steps
 
-1. **创建项目文件**
+1. **Create project file**
 
-创建 `api/proxy.js` 文件：
+Create `api/proxy.js`:
 
 ```javascript
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 
 export default async function handler(req, res) {
-  // 健康检查
+  // Health check
   if (req.url === "/health") {
     return res.status(200).send("OK");
   }
-  
-  // 转发Gemini API请求
+
+  // Forward Gemini API requests
   if (req.url.startsWith("/v1beta/")) {
     const targetUrl = `${GEMINI_API_BASE}${req.url}`;
-    
+
     try {
       const response = await fetch(targetUrl, {
         method: req.method,
@@ -116,14 +122,14 @@ export default async function handler(req, res) {
         },
         body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
       });
-      
+
       const data = await response.text();
-      
+
       res.status(response.status);
       response.headers.forEach((value, key) => {
         res.setHeader(key, value);
       });
-      
+
       return res.send(data);
     } catch (error) {
       return res.status(500).json({
@@ -132,12 +138,12 @@ export default async function handler(req, res) {
       });
     }
   }
-  
+
   return res.status(404).send("Not Found");
 }
 ```
 
-2. **配置vercel.json**
+2. **Configure `vercel.json`**
 
 ```json
 {
@@ -155,42 +161,44 @@ export default async function handler(req, res) {
 }
 ```
 
-3. **部署**
+3. **Deploy**
 
 ```bash
-# 安装Vercel CLI
+# Install Vercel CLI
 npm i -g vercel
 
-# 部署
+# Deploy production
 vercel --prod
 ```
 
+---
+
 ### 3. Netlify Functions
 
-Netlify Functions基于AWS Lambda。
+Netlify Functions run on AWS Lambda.
 
-#### 部署步骤
+#### Deployment Steps
 
-1. **创建函数文件**
+1. **Create function file**
 
-创建 `netlify/functions/proxy.js` 文件：
+Create `netlify/functions/proxy.js`:
 
 ```javascript
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 
 exports.handler = async (event, context) => {
-  // 健康检查
+  // Health check
   if (event.path === "/health") {
     return {
       statusCode: 200,
       body: "OK",
     };
   }
-  
-  // 转发Gemini API请求
+
+  // Forward Gemini API requests
   if (event.path.startsWith("/v1beta/")) {
     const targetUrl = `${GEMINI_API_BASE}${event.path}`;
-    
+
     try {
       const response = await fetch(targetUrl, {
         method: event.httpMethod,
@@ -200,9 +208,9 @@ exports.handler = async (event, context) => {
         },
         body: event.body,
       });
-      
+
       const data = await response.text();
-      
+
       return {
         statusCode: response.status,
         headers: Object.fromEntries(response.headers),
@@ -218,7 +226,7 @@ exports.handler = async (event, context) => {
       };
     }
   }
-  
+
   return {
     statusCode: 404,
     body: "Not Found",
@@ -226,7 +234,7 @@ exports.handler = async (event, context) => {
 };
 ```
 
-2. **配置netlify.toml**
+2. **Configure `netlify.toml`**
 
 ```toml
 [build]
@@ -238,43 +246,45 @@ exports.handler = async (event, context) => {
   status = 200
 ```
 
-## 配置要点
+---
 
-### 1. 健康检查端点
+## Configuration Notes
 
-所有实例必须提供 `/health` 端点，返回200状态码。
+### 1. Health Check Endpoint
 
-### 2. 请求转发
+All instances must provide a `/health` endpoint returning HTTP 200.
 
-- 保持原始请求方法（GET、POST等）
-- 转发所有相关请求头
-- 正确处理请求体
-- 保持响应格式
+### 2. Request Forwarding
 
-### 3. 错误处理
+* Preserve original HTTP methods (GET, POST, etc.)
+* Forward all relevant request headers
+* Properly handle request bodies
+* Maintain response format
 
-- 网络错误处理
-- 超时处理
-- 适当的错误响应格式
+### 3. Error Handling
 
-### 4. 性能优化
+* Network error handling
+* Timeout handling
+* Proper error response formatting
 
-- 设置合理的超时时间
-- 启用压缩
-- 使用连接池（如果支持）
+### 4. Performance Optimization
 
-## 安全考虑
+* Set reasonable timeouts
+* Enable compression where supported
+* Use connection pooling if possible
 
-### 1. API Key处理
+---
 
-- 不在Serverless实例中存储API Key
-- API Key通过请求头传递
-- 验证请求来源（可选）
+## Security Considerations
 
-### 2. 访问控制
+### 1. API Key Handling
+
+* Do not store API keys in the serverless instance
+* Pass API key via request headers
+* Optionally validate request origins
 
 ```javascript
-// 可选：验证请求来源
+// Optional: Validate request origin
 const allowedOrigins = ["your-allowed-domain.com"];
 const origin = req.headers.origin;
 
@@ -283,127 +293,146 @@ if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
 }
 ```
 
-### 3. 速率限制
+### 2. Access Control
+
+Implement access control as needed.
+
+### 3. Rate Limiting
 
 ```javascript
-// 可选：简单的速率限制
+// Optional simple rate limiting
 const rateLimitMap = new Map();
 
 function checkRateLimit(ip) {
   const now = Date.now();
-  const windowMs = 60000; // 1分钟
+  const windowMs = 60000; // 1 minute
   const maxRequests = 100;
-  
+
   if (!rateLimitMap.has(ip)) {
     rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
     return true;
   }
-  
+
   const limit = rateLimitMap.get(ip);
   if (now > limit.resetTime) {
     limit.count = 1;
     limit.resetTime = now + windowMs;
     return true;
   }
-  
+
   if (limit.count >= maxRequests) {
     return false;
   }
-  
+
   limit.count++;
   return true;
 }
 ```
 
-## 监控和调试
+---
 
-### 1. 日志记录
+## Monitoring and Debugging
+
+### 1. Logging
 
 ```javascript
 console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
 ```
 
-### 2. 性能监控
+### 2. Performance Monitoring
 
 ```javascript
 const startTime = Date.now();
-// ... 处理请求
+// ... handle request
 const duration = Date.now() - startTime;
 console.log(`Request completed in ${duration}ms`);
 ```
 
-### 3. 错误追踪
+### 3. Error Tracking
 
 ```javascript
 try {
-  // 请求处理
+  // request handling
 } catch (error) {
   console.error("Request failed:", error);
-  // 发送错误到监控服务
+  // send error to monitoring service if applicable
 }
 ```
 
-## 故障排除
+---
 
-### 常见问题
+## Troubleshooting
 
-1. **CORS错误**
-   - 确保设置正确的CORS头部
-   - 检查预检请求处理
+### Common Issues
 
-2. **超时错误**
-   - 增加函数超时时间
-   - 优化请求处理逻辑
+1. **CORS errors**
 
-3. **内存限制**
-   - 避免缓存大量数据
-   - 及时释放资源
+   * Ensure correct CORS headers
+   * Handle preflight requests
 
-4. **冷启动延迟**
-   - 使用预热机制
-   - 选择支持保持连接的平台
+2. **Timeout errors**
 
-### 调试技巧
+   * Increase function timeout
+   * Optimize request handling
 
-1. **本地测试**
+3. **Memory limits**
+
+   * Avoid caching large data
+   * Release resources promptly
+
+4. **Cold start delays**
+
+   * Use warming strategies
+   * Choose platforms supporting persistent connections
+
+### Debugging Tips
+
+1. **Local testing**
+
 ```bash
-# 使用curl测试健康检查
+# Test health endpoint
 curl https://your-instance.com/health
 
-# 测试API转发
+# Test API forwarding
 curl -X POST https://your-instance.com/v1beta/models/gemini-pro:generateContent \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
   -d '{"contents":[{"parts":[{"text":"Hello"}]}]}'
 ```
 
-2. **日志分析**
-   - 查看平台提供的日志
-   - 分析错误模式
-   - 监控性能指标
+2. **Log analysis**
 
-## 最佳实践
-
-1. **多区域部署**
-   - 在不同地理位置部署实例
-   - 提高全球访问速度
-   - 增强容错能力
-
-2. **负载均衡**
-   - 配置多个实例
-   - 使用健康检查
-   - 实现故障转移
-
-3. **监控告警**
-   - 设置可用性监控
-   - 配置错误率告警
-   - 监控响应时间
-
-4. **版本管理**
-   - 使用版本控制
-   - 实现蓝绿部署
-   - 保持回滚能力
+   * Review platform logs
+   * Analyze error patterns
+   * Monitor performance metrics
 
 ---
 
-通过以上指南，您可以在各种Serverless平台上成功部署Gemini API转发实例，实现高效的多IP分发系统。
+## Best Practices
+
+1. **Multi-region deployment**
+
+   * Deploy instances in different geographic regions
+   * Improve global access speed
+   * Enhance fault tolerance
+
+2. **Load balancing**
+
+   * Configure multiple instances
+   * Use health checks
+   * Implement failover mechanisms
+
+3. **Monitoring and alerts**
+
+   * Setup availability monitoring
+   * Configure error rate alerts
+   * Monitor response times
+
+4. **Version management**
+
+   * Use version control
+   * Implement blue-green deployments
+   * Maintain rollback capabilities
+
+
+
