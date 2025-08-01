@@ -17,16 +17,23 @@ async function handler(req: Request): Promise<Response> {
     const headers = new Headers(req.headers);
     headers.set("User-Agent", "Gemini-Aggregator-Serverless/1.0");
 
+    // ✅ SAFELY read the request body
+    let body: string | undefined = undefined;
+    if (req.method !== "GET" && req.body) {
+      body = await req.text(); // convert stream to string
+    }
+
     try {
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: req.body,
+        body,
       });
 
-      return new Response(response.body, {
+      const responseBody = await response.text(); // also safer
+
+      return new Response(responseBody, {
         status: response.status,
-        statusText: response.statusText,
         headers: response.headers,
       });
     } catch (error) {
@@ -40,5 +47,5 @@ async function handler(req: Request): Promise<Response> {
   return new Response("Not Found", { status: 404 });
 }
 
-// For serverless/Deno Deploy, export the handler (do not call serve)
-export default handler;
+// ✅ Call serve here directly for Deno Deploy
+serve(handler);
