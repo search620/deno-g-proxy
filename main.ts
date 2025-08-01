@@ -38,5 +38,4 @@ async function handler(req: Request): Promise<Response> {
   return new Response("Not Found", { status: 404 });
 }
 
-const port = Number(Deno.env.get("PORT")) || 8000;
-serve(handler, { port });
+serve(handler);
