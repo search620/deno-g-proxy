@@ -40,6 +40,5 @@ async function handler(req: Request): Promise<Response> {
   return new Response("Not Found", { status: 404 });
 }
 
-// Listen on the port defined by Deno Deploy environment or default to 8000
-const port = Number(Deno.env.get("PORT")) || 8000;
-serve(handler, { port });
+// For serverless/Deno Deploy, export the handler (do not call serve)
+export default handler;
