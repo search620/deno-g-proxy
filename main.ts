@@ -5,12 +5,10 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   
-  // 健康检查端点
   if (url.pathname === "/health") {
     return new Response("OK", { status: 200 });
   }
   
-  // 转发Gemini API请求
   if (url.pathname.startsWith("/v1beta/")) {
     const targetUrl = `${GEMINI_API_BASE}${url.pathname}${url.search}`;
     
@@ -40,4 +38,5 @@ async function handler(req: Request): Promise<Response> {
   return new Response("Not Found", { status: 404 });
 }
 
-serve(handler, { port: 8000 });
+const port = Number(Deno.env.get("PORT")) || 8000;
+serve(handler, { port });
